@@ -6,16 +6,16 @@ def _to_bool(v):
     if v is None: return False
     return str(v).strip().lower() in ("1","true","yes","on","y")
 
-API_ID = int(os.getenv("API_ID","0"))
-API_HASH = os.getenv("API_HASH","")
-BOT_TOKEN = os.getenv("BOT_TOKEN","")
+API_ID = int(os.getenv("API_ID","18799477"))
+API_HASH = os.getenv("API_HASH","305cfa73e8b06daa97573809532034e5")
+BOT_TOKEN = os.getenv("BOT_TOKEN","6596235517:AAEgfj6Lhrh99QWM6z_9KoRN33ObGolvxN0")
 
 # MongoDB (optional)
 MONGO_URI = os.getenv("MONGO_URI","")   # e.g. mongodb+srv://...
 DB_NAME = os.getenv("DB_NAME","autofilter_bot")
 
 # Admin IDs (space-separated)
-ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS","").split() if x.strip().isdigit()}
+ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS","5781922761").split() if x.strip().isdigit()}
 
 # Bot basics
 BOT_NAME = os.getenv("BOT_NAME","AutoFilterBot")
