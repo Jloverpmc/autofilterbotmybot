@@ -1,11 +1,22 @@
+import sys
 import asyncio
-from aiohttp import web
 from pyrogram import Client
 import bot.config as config
 
-# -----------------------------
-# Create the Telegram bot client
-# -----------------------------
+def check_config():
+    missing = []
+    if not config.API_ID:
+        missing.append("API_ID")
+    if not config.API_HASH:
+        missing.append("API_HASH")
+    if not config.BOT_TOKEN:
+        missing.append("BOT_TOKEN")
+    if missing:
+        print("[!] Missing config values:", ", ".join(missing))
+        sys.exit(1)
+
+check_config()
+
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
@@ -14,36 +25,28 @@ app = Client(
     plugins=dict(root="bot/plugins")
 )
 
-# -----------------------------
-# Simple web server for Koyeb
-# -----------------------------
-async def handle(request):
-    return web.Response(text="✅ AutoFilter Bot is running!")
-
-async def start_bot(app_runner):
+async def main():
     await app.start()
-    print("🚀 Telegram AutoFilter Bot started!")
+    print("✅ Telegram AutoFilter Bot is connected!")
+    
+    # Optional: Keep Koyeb web server alive
+    import aiohttp
+    from aiohttp import web
 
-async def stop_bot(app_runner):
-    await app.stop()
-    print("🛑 Telegram AutoFilter Bot stopped!")
+    async def handle(request):
+        return web.Response(text="✅ AutoFilter Bot is running!")
 
-# -----------------------------
-# Main entry for Koyeb
-# -----------------------------
-if __name__ == "__main__":
-    print("🌐 Webserver starting on port 8080...")
-
-    # Create aiohttp app
     web_app = web.Application()
-    web_app.add_routes([web.get('/', handle)])
+    web_app.add_routes([web.get("/", handle)])
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
+    print("🌐 Webserver running on port 8080")
 
-    # Start Telegram bot in background
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_bot(app))
+    # Keep the bot running
+    await asyncio.Event().wait()
 
-    # Graceful shutdown
-    web_app.on_cleanup.append(stop_bot)
-
-    # Run web server on port 8080
-    web.run_app(web_app, port=8080)
+if __name__ == "__main__":
+    print("🚀 Starting AutoFilter Bot...")
+    asyncio.run(main())
