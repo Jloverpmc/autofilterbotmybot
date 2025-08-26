@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import MessageNotModified
 from bot.database.store import get_settings, update_setting
 import bot.config as config
 import json
@@ -73,62 +74,71 @@ async def settings_main(bot, message):
     await message.reply("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
 
 # -----------------------
-# Callback router
+# Callback router with MessageNotModified handling
 # -----------------------
 @Client.on_callback_query(filters.regex(r'^settings:'))
 async def settings_router(bot, query):
     key = query.data.split(":", 1)[1]
     s = await get_settings()
 
-    if key == "root":
-        return await query.message.edit("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
-    if key == "close":
-        return await query.message.edit("Settings closed.")
+    try:
+        if key == "root":
+            return await query.message.edit(
+                "⚙️ Please choose the setting you want to update:",
+                reply_markup=settings_kb()
+            )
 
-    if key == "caption":
-        current = s.get("caption_template") or "❌ Not set"
-        text = ("📝 Caption Template\n\nUse variables:\n{filename} {size} {duration} {quality} {language} "
-                "{subtitle} {episode} {season} {branding}\n\n"
-                f"Current:\n<code>{current}</code>")
-        return await query.message.edit(text, reply_markup=caption_kb())
+        if key == "close":
+            return await query.message.edit("Settings closed.")
 
-    if key == "branding":
-        current = s.get("branding") or "❌ Not set"
-        return await query.message.edit(f"✨ Branding\n\nCurrent:\n<code>{current}</code>", reply_markup=branding_kb())
+        if key == "caption":
+            current = s.get("caption_template") or "❌ Not set"
+            text = ("📝 Caption Template\n\nUse variables:\n{filename} {size} {duration} {quality} {language} "
+                    "{subtitle} {episode} {season} {branding}\n\n"
+                    f"Current:\n<code>{current}</code>")
+            return await query.message.edit(text, reply_markup=caption_kb())
 
-    if key == "autodel":
-        secs = s.get("autodelete_seconds") or config.DEFAULT_AUTODELETE_SECONDS
-        note = s.get("autodelete_note") or config.DEFAULT_AUTODELETE_NOTE
-        expired = s.get("autodelete_expired") or config.DEFAULT_AUTODELETE_EXPIRED
-        text = (f"🗑 Auto Delete Settings\n\nTime (seconds): <code>{secs}</code>\n"
-                f"Before-note: <code>{note}</code>\nAfter-msg: <code>{expired}</code>")
-        return await query.message.edit(text, reply_markup=autodel_kb())
+        if key == "branding":
+            current = s.get("branding") or "❌ Not set"
+            return await query.message.edit(f"✨ Branding\n\nCurrent:\n<code>{current}</code>", reply_markup=branding_kb())
 
-    if key == "forcesub":
-        fs = s.get("force_sub") or {}
-        enabled = bool(fs and fs.get("channel"))
-        current = f"Enabled: {fs.get('channel')} ({fs.get('mode')})" if enabled else "Disabled"
-        return await query.message.edit(f"🚦 Force Subscribe\n\nCurrent: {current}", reply_markup=forcesub_kb())
+        if key == "autodel":
+            secs = s.get("autodelete_seconds") or config.DEFAULT_AUTODELETE_SECONDS
+            note = s.get("autodelete_note") or config.DEFAULT_AUTODELETE_NOTE
+            expired = s.get("autodelete_expired") or config.DEFAULT_AUTODELETE_EXPIRED
+            text = (f"🗑 Auto Delete Settings\n\nTime (seconds): <code>{secs}</code>\n"
+                    f"Before-note: <code>{note}</code>\nAfter-msg: <code>{expired}</code>")
+            return await query.message.edit(text, reply_markup=autodel_kb())
 
-    if key == "shortdet":
-        conf = s.get("shortener") or {}
-        text = ("🔗 Shortener Details\n\n"
-                f"Enabled: <code>{conf.get('enabled')}</code>\n"
-                f"Provider: <code>{conf.get('provider')}</code>\n"
-                f"API URL: <code>{conf.get('api_url') or '-'}</code>\n"
-                f"API KEY: <code>{'****' if conf.get('api_key') else '-'}</code>\n"
-                f"Extra JSON: <code>{json.dumps(conf.get('extra') or {}, ensure_ascii=False)}</code>")
-        return await query.message.edit(text, reply_markup=shortdet_kb())
+        if key == "forcesub":
+            fs = s.get("force_sub") or {}
+            enabled = bool(fs and fs.get("channel"))
+            current = f"Enabled: {fs.get('channel')} ({fs.get('mode')})" if enabled else "Disabled"
+            return await query.message.edit(f"🚦 Force Subscribe\n\nCurrent: {current}", reply_markup=forcesub_kb())
 
-    if key == "shortmode":
-        conf = s.get("shortener") or {}
-        enabled = conf.get("enabled", False)
-        return await query.message.edit(f"🔗 Short Mode is: <b>{'ON' if enabled else 'OFF'}</b>", reply_markup=shortmode_kb())
+        if key == "shortdet":
+            conf = s.get("shortener") or {}
+            text = ("🔗 Shortener Details\n\n"
+                    f"Enabled: <code>{conf.get('enabled')}</code>\n"
+                    f"Provider: <code>{conf.get('provider')}</code>\n"
+                    f"API URL: <code>{conf.get('api_url') or '-'}</code>\n"
+                    f"API KEY: <code>{'****' if conf.get('api_key') else '-'}</code>\n"
+                    f"Extra JSON: <code>{json.dumps(conf.get('extra') or {}, ensure_ascii=False)}</code>")
+            return await query.message.edit(text, reply_markup=shortdet_kb())
 
-    return await query.message.edit(
-        "🔧 Section not implemented yet.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back", callback_data="settings:root")]])
-    )
+        if key == "shortmode":
+            conf = s.get("shortener") or {}
+            enabled = conf.get("enabled", False)
+            return await query.message.edit(f"🔗 Short Mode is: <b>{'ON' if enabled else 'OFF'}</b>",
+                                            reply_markup=shortmode_kb())
+
+        return await query.message.edit(
+            "🔧 Section not implemented yet.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back", callback_data="settings:root")]])
+        )
+
+    except MessageNotModified:
+        await query.answer()  # silently ignore if same content
 
 # -----------------------
 # Capture text replies (admin only)
@@ -151,4 +161,7 @@ async def capture_text(bot, message):
         except:
             return await message.reply("❌ Invalid number.")
         await update_setting("autodelete_seconds", secs)
-        bot.aut
+        bot.autodel_secs_wait = None
+        return await message.reply(f"✅ Auto delete set to {secs} seconds.")
+
+    # Shortener fields can be handled similarly
