@@ -1,35 +1,35 @@
-import sys
+import asyncio
 from pyrogram import Client
 import bot.config as config
-import asyncio
+from aiohttp import web
 
-def check_config():
-    miss = []
-    if not config.API_ID:
-        miss.append("API_ID")
-    if not config.API_HASH:
-        miss.append("API_HASH")
-    if not config.BOT_TOKEN:
-        miss.append("BOT_TOKEN")
-    if miss:
-        print("[!] Missing config values:", ", ".join(miss))
-        sys.exit(1)
-
-check_config()
-
+# Initialize Pyrogram client
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
-    plugins=dict(root="bot/plugins")  # Only load plugins folder
+    plugins=dict(root="bot/plugins")
 )
 
-async def keep_alive():
-    # Keep Koyeb web service alive
-    while True:
-        await asyncio.sleep(60)
+# Minimal web server for Koyeb health checks
+async def handle(request):
+    return web.Response(text="Bot is running ✅")
+
+async def start_webserver():
+    server = web.Application()
+    server.router.add_get("/", handle)
+    runner = web.AppRunner(server)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)  # Koyeb default port
+    await site.start()
+    print("🌐 Webserver running on port 8080")
+
+# Start both bot and webserver
+async def main():
+    await asyncio.gather(app.start(), start_webserver())
+    print("🚀 Telegram AutoFilter Bot started!")
+    await app.idle()
 
 if __name__ == "__main__":
-    print("🚀 Telegram AutoFilter Bot starting...")
-    app.run(keep_alive())
+    asyncio.run(main())
