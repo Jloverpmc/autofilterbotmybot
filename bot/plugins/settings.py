@@ -4,34 +4,37 @@ from bot.database.store import get_settings, update_setting
 import bot.config as config
 import json
 
+# Side-by-side buttons helper
+def row_buttons(*args):
+    return [InlineKeyboardButton(text, callback_data=data) for text, data in args]
+
 def settings_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📂 DB Channels", callback_data="settings:db"),
-         InlineKeyboardButton("📢 Dest Channels", callback_data="settings:dest")],
-        [InlineKeyboardButton("🔔 Updates Channels", callback_data="settings:updates"),
-         InlineKeyboardButton("🚦 Force Subscribe", callback_data="settings:forcesub")],
-        [InlineKeyboardButton("🏷️ Caption", callback_data="settings:caption"),
-         InlineKeyboardButton("✨ Branding", callback_data="settings:branding")],
-        [InlineKeyboardButton("🔗 Short Det", callback_data="settings:shortdet"),
-         InlineKeyboardButton("🔗 Short Mode", callback_data="settings:shortmode")],
-        [InlineKeyboardButton("🗑 Auto Delete", callback_data="settings:autodel"),
-         InlineKeyboardButton("❌ Close", callback_data="settings:close")]
+        row_buttons(("📂 DB Channels","settings:db"), ("📢 Dest Channels","settings:dest")),
+        row_buttons(("🔔 Updates Channels","settings:updates"), ("🚦 Force Subscribe","settings:forcesub")),
+        row_buttons(("🏷️ Caption","settings:caption"), ("✨ Branding","settings:branding")),
+        row_buttons(("🔗 Short Det","settings:shortdet"), ("🔗 Short Mode","settings:shortmode")),
+        row_buttons(("🗑 Auto Delete","settings:autodel"), ("❌ Close","settings:close"))
     ])
 
-@Client.on_message(filters.private & filters.command("settings") & filters.user(config.ADMIN_IDS))
+# Admin-only settings command
+@Client.on_message(filters.private & filters.command("settings") & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def settings_main(bot, message):
     await message.reply("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
 
+# Callback router
 @Client.on_callback_query(filters.regex(r'^settings:'))
 async def settings_router(bot, query):
     key = query.data.split(":",1)[1]
     s = await get_settings()
 
+    # Always handle back/close buttons safely
     if key == "root":
         return await query.message.edit("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
     if key == "close":
         return await query.message.edit("Settings closed.")
 
+    # Caption
     if key == "caption":
         current = s.get("caption_template") or "❌ Not set"
         kb = InlineKeyboardMarkup([
@@ -39,11 +42,11 @@ async def settings_router(bot, query):
              InlineKeyboardButton("🗑 Reset", callback_data="caption:reset")],
             [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
         ])
-        text = ("📝 Caption Template\n\nUse variables:\n{filename} {size} {duration} {quality} "
-                "{language} {subtitle} {episode} {season} {branding}\n\n"
+        text = ("📝 Caption Template\n\nUse variables:\n{filename} {size} {duration} {quality} {language} {subtitle} {episode} {season} {branding}\n\n"
                 f"Current:\n<code>{current}</code>")
         return await query.message.edit(text, reply_markup=kb)
 
+    # Branding
     if key == "branding":
         current = s.get("branding") or "❌ Not set"
         kb = InlineKeyboardMarkup([
@@ -53,6 +56,7 @@ async def settings_router(bot, query):
         ])
         return await query.message.edit(f"✨ Branding\n\nCurrent:\n<code>{current}</code>", reply_markup=kb)
 
+    # Auto-delete
     if key == "autodel":
         secs = s.get("autodelete_seconds") or config.DEFAULT_AUTODELETE_SECONDS
         note = s.get("autodelete_note") or config.DEFAULT_AUTODELETE_NOTE
@@ -60,12 +64,13 @@ async def settings_router(bot, query):
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⏱ Set Seconds", callback_data="autodel:setsecs"),
              InlineKeyboardButton("✍️ Note (before)", callback_data="autodel:setnote")],
-            [InlineKeyboardButton("✍️ Message (after)", callback_data="autodel:setexpired"),
-             InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
+            [InlineKeyboardButton("✍️ Message (after)", callback_data="autodel:setexpired")],
+            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
         ])
         text = (f"🗑 Auto Delete Settings\n\nTime (seconds): <code>{secs}</code>\nBefore-note: <code>{note}</code>\nAfter-msg: <code>{expired}</code>")
         return await query.message.edit(text, reply_markup=kb)
 
+    # Force subscribe
     if key == "forcesub":
         fs = s.get("force_sub") or {}
         enabled = bool(fs and fs.get("channel"))
@@ -77,6 +82,7 @@ async def settings_router(bot, query):
         current = f"Enabled: {fs.get('channel')} ({fs.get('mode')})" if enabled else "Disabled"
         return await query.message.edit(f"🚦 Force Subscribe\n\nCurrent: {current}", reply_markup=kb)
 
+    # Shortener
     if key == "shortdet":
         conf = s.get("shortener") or {}
         text = ("🔗 Shortener Details\n\n"
@@ -97,17 +103,14 @@ async def settings_router(bot, query):
     if key == "shortmode":
         conf = s.get("shortener") or {}
         enabled = conf.get("enabled", False)
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔘 Toggle ON/OFF", callback_data="short:toggle")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔘 Toggle ON/OFF", callback_data="short:toggle"),
+                                    InlineKeyboardButton("⬅ Back", callback_data="settings:root")]])
         return await query.message.edit(f"🔗 Short Mode is: <b>{'ON' if enabled else 'OFF'}</b>", reply_markup=kb)
 
-    return await query.message.edit("🔧 Section not implemented yet.", reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-    ]))
+    # Fallback
+    return await query.message.edit("🔧 Section not implemented yet.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back", callback_data="settings:root")]]))
 
-# Capture replies for set operations
+# Capture replies for admin only
 @Client.on_message(filters.private & filters.text & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def capture_text(bot, message):
     if getattr(bot, "caption_wait", None) == message.from_user.id:
