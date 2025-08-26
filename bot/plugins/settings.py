@@ -18,7 +18,8 @@ def settings_kb():
         [InlineKeyboardButton("❌ Close", callback_data="settings:close")],
     ])
 
-@Client.on_message(filters.private & filters.command("settings") & filters.user(config.ADMIN_IDS))
+# FIX: Convert ADMIN_IDS to list to avoid "unhashable type: set" error
+@Client.on_message(filters.private & filters.command("settings") & filters.user(list(config.ADMIN_IDS)))
 async def settings_main(bot, message):
     await message.reply("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
 
@@ -96,7 +97,7 @@ async def settings_router(bot, query):
         return await query.message.edit(f"🔗 Short Mode is: <b>{'ON' if enabled else 'OFF'}</b>", reply_markup=kb)
     return await query.message.edit("🔧 Section not implemented yet.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back", callback_data="settings:root")]]))
 
-# capture replies for set operations (simple implementation)
+# capture replies for set operations (already fine)
 @Client.on_message(filters.private & filters.text & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def capture_text(bot, message):
     if getattr(bot, "caption_wait", None) == message.from_user.id:
@@ -115,4 +116,3 @@ async def capture_text(bot, message):
         await update_setting("autodelete_seconds", secs)
         bot.autodel_secs_wait = None
         return await message.reply(f"✅ Auto delete set to {secs} seconds.")
-    # shortener fields handled similarly...
