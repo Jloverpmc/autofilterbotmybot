@@ -1,4 +1,4 @@
-aiohttp>=4.0,<5
+aiohttp<5,>=4.1
 pyrogram==2.0.106
 tgcrypto==1.2.5
 motor==3.4.0
