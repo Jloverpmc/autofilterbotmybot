@@ -1,9 +1,11 @@
 import asyncio
+from aiohttp import web
 from pyrogram import Client
 import bot.config as config
-from aiohttp import web
 
-# Initialize Pyrogram client
+# -----------------------------
+# Create the Telegram bot client
+# -----------------------------
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
@@ -12,24 +14,36 @@ app = Client(
     plugins=dict(root="bot/plugins")
 )
 
-# Minimal web server for Koyeb health checks
+# -----------------------------
+# Simple web server for Koyeb
+# -----------------------------
 async def handle(request):
-    return web.Response(text="Bot is running ✅")
+    return web.Response(text="✅ AutoFilter Bot is running!")
 
-async def start_webserver():
-    server = web.Application()
-    server.router.add_get("/", handle)
-    runner = web.AppRunner(server)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)  # Koyeb default port
-    await site.start()
-    print("🌐 Webserver running on port 8080")
-
-# Start both bot and webserver
-async def main():
-    await asyncio.gather(app.start(), start_webserver())
+async def start_bot(app_runner):
+    await app.start()
     print("🚀 Telegram AutoFilter Bot started!")
-    await app.idle()
 
+async def stop_bot(app_runner):
+    await app.stop()
+    print("🛑 Telegram AutoFilter Bot stopped!")
+
+# -----------------------------
+# Main entry for Koyeb
+# -----------------------------
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("🌐 Webserver starting on port 8080...")
+
+    # Create aiohttp app
+    web_app = web.Application()
+    web_app.add_routes([web.get('/', handle)])
+
+    # Start Telegram bot in background
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot(app))
+
+    # Graceful shutdown
+    web_app.on_cleanup.append(stop_bot)
+
+    # Run web server on port 8080
+    web.run_app(web_app, port=8080)
