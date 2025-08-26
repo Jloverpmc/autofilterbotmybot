@@ -3,7 +3,7 @@ from pyrogram import Client
 from aiohttp import web
 import bot.config as config
 
-# Check required config
+# Config check
 def check_config():
     miss = []
     if not config.API_ID:
@@ -18,7 +18,7 @@ def check_config():
 
 check_config()
 
-# Create Pyrogram Client
+# Pyrogram Client
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
@@ -27,7 +27,7 @@ app = Client(
     plugins=dict(root="bot/plugins")
 )
 
-# Simple web handler to keep Koyeb happy
+# Fast web response
 async def handle(request):
     return web.Response(text="✅ AutoFilter Bot is running!")
 
@@ -41,11 +41,13 @@ async def start_web():
     print("🌐 Webserver running on port 8080...")
 
 async def main():
-    await app.start()
+    await start_web()        # start web first
+    await app.start()        # then start bot
     print("🚀 Telegram AutoFilter Bot started!")
-    await start_web()
+
+    # Keep alive
     while True:
-        await asyncio.sleep(3600)  # Keep alive
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())
