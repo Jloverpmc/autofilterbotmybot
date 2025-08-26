@@ -1,6 +1,7 @@
 import sys
 from pyrogram import Client
 import bot.config as config
+import asyncio
 
 def check_config():
     miss = []
@@ -24,6 +25,11 @@ app = Client(
     plugins=dict(root="bot/plugins")
 )
 
+async def keep_alive():
+    # Simple loop to keep the bot running in Koyeb web service
+    while True:
+        await asyncio.sleep(60)
+
 if __name__ == "__main__":
     print("🚀 Telegram AutoFilter Bot starting...")
-    app.run()
+    app.run(keep_alive())
