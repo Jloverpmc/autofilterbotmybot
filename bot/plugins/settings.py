@@ -5,9 +5,8 @@ import bot.config as config
 import json
 
 # -----------------------
-# Keyboards
+# Keyboards (side-by-side buttons)
 # -----------------------
-
 def settings_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📂 DB Channels", callback_data="settings:db"),
@@ -152,5 +151,4 @@ async def capture_text(bot, message):
         except:
             return await message.reply("❌ Invalid number.")
         await update_setting("autodelete_seconds", secs)
-        bot.autodel_secs_wait = None
-        return await message.reply(f"✅ Auto delete set to {secs} seconds.")
+        bot.aut
