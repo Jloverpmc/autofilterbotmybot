@@ -22,11 +22,11 @@ app = Client(
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
-    plugins=dict(root="bot/plugins")
+    plugins=dict(root="bot/plugins")  # Only load plugins folder
 )
 
 async def keep_alive():
-    # Simple loop to keep the bot running in Koyeb web service
+    # Keep Koyeb web service alive
     while True:
         await asyncio.sleep(60)
 
