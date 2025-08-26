@@ -1,53 +1,45 @@
+# main.py
+from pyrogram import Client, filters
 import asyncio
-from pyrogram import Client
-from aiohttp import web
-import bot.config as config
+from flask import Flask
+import threading
+import os
 
-# Config check
-def check_config():
-    miss = []
-    if not config.API_ID:
-        miss.append("API_ID")
-    if not config.API_HASH:
-        miss.append("API_HASH")
-    if not config.BOT_TOKEN:
-        miss.append("BOT_TOKEN")
-    if miss:
-        print("[!] Missing config values:", ", ".join(miss))
-        exit(1)
-
-check_config()
-
-# Pyrogram Client
-app = Client(
-    "autofilter-bot",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN,
-    plugins=dict(root="bot/plugins")
+# ----------------------------
+# Telegram Bot Initialization
+# ----------------------------
+bot = Client(
+    "my_bot",
+    api_id=int(os.environ.get("API_ID")),
+    api_hash=os.environ.get("API_HASH"),
+    bot_token=os.environ.get("BOT_TOKEN")
 )
 
-# Fast web response
-async def handle(request):
-    return web.Response(text="✅ AutoFilter Bot is running!")
+# Example handler (you can keep all your existing handlers)
+@bot.on_message(filters.command("start"))
+async def start_handler(client, message):
+    await message.reply_text("🚀 AutoFilter Bot is running!")
 
-async def start_web():
-    web_app = web.Application()
-    web_app.add_routes([web.get("/", handle)])
-    runner = web.AppRunner(web_app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
-    await site.start()
-    print("🌐 Webserver running on port 8080...")
+# ----------------------------
+# Web server for Koyeb health check
+# ----------------------------
+app = Flask(__name__)
 
-async def main():
-    await start_web()        # start web first
-    await app.start()        # then start bot
-    print("🚀 Telegram AutoFilter Bot started!")
+@app.route("/")
+def home():
+    return "Bot is running!", 200
 
-    # Keep alive
-    while True:
-        await asyncio.sleep(3600)
+def run_webserver():
+    # Koyeb requires 0.0.0.0 and port 8080
+    app.run(host="0.0.0.0", port=8080)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# ----------------------------
+# Start webserver in a separate thread
+# ----------------------------
+threading.Thread(target=run_webserver).start()
+
+# ----------------------------
+# Start Telegram bot
+# ----------------------------
+print("🚀 Telegram AutoFilter Bot starting...")
+bot.run()
