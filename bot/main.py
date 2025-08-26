@@ -1,45 +1,35 @@
-# main.py
-from pyrogram import Client, filters
+import sys
+from pyrogram import Client
+import bot.config as config
 import asyncio
-from flask import Flask
-import threading
-import os
 
-# ----------------------------
-# Telegram Bot Initialization
-# ----------------------------
-bot = Client(
-    "my_bot",
-    api_id=int(os.environ.get("API_ID")),
-    api_hash=os.environ.get("API_HASH"),
-    bot_token=os.environ.get("BOT_TOKEN")
+def check_config():
+    miss = []
+    if not config.API_ID:
+        miss.append("API_ID")
+    if not config.API_HASH:
+        miss.append("API_HASH")
+    if not config.BOT_TOKEN:
+        miss.append("BOT_TOKEN")
+    if miss:
+        print("[!] Missing config values:", ", ".join(miss))
+        sys.exit(1)
+
+check_config()
+
+app = Client(
+    "autofilter-bot",
+    api_id=config.API_ID,
+    api_hash=config.API_HASH,
+    bot_token=config.BOT_TOKEN,
+    plugins=dict(root="bot/plugins")  # Only load plugins folder
 )
 
-# Example handler (you can keep all your existing handlers)
-@bot.on_message(filters.command("start"))
-async def start_handler(client, message):
-    await message.reply_text("🚀 AutoFilter Bot is running!")
+async def keep_alive():
+    # Keep Koyeb web service alive
+    while True:
+        await asyncio.sleep(60)
 
-# ----------------------------
-# Web server for Koyeb health check
-# ----------------------------
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Bot is running!", 200
-
-def run_webserver():
-    # Koyeb requires 0.0.0.0 and port 8080
-    app.run(host="0.0.0.0", port=8080)
-
-# ----------------------------
-# Start webserver in a separate thread
-# ----------------------------
-threading.Thread(target=run_webserver).start()
-
-# ----------------------------
-# Start Telegram bot
-# ----------------------------
-print("🚀 Telegram AutoFilter Bot starting...")
-bot.run()
+if __name__ == "__main__":
+    print("🚀 Telegram AutoFilter Bot starting...")
+    app.run(keep_alive())
