@@ -14,8 +14,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN","6596235517:AAEgfj6Lhrh99QWM6z_9KoRN33ObGolvxN
 MONGO_URI = os.getenv("MONGO_URI","")   # e.g. mongodb+srv://...
 DB_NAME = os.getenv("DB_NAME","autofilter_bot")
 
-# Admin IDs (space-separated)
-ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS","5781922761").split() if x.strip().isdigit()}
+# Admin IDs (space-separated) ✅ Fixed: use list instead of set
+ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS","5781922761").split() if x.strip().isdigit()]
 
 # Bot basics
 BOT_NAME = os.getenv("BOT_NAME","AutoFilterBot")
