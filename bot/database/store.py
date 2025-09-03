@@ -1,147 +1,73 @@
 # bot/database/store.py
-from motor.motor_asyncio import AsyncIOMotorClient
+import motor.motor_asyncio
 import os
 
-MONGO_URI = os.environ.get("MONGO_URI")
-client = AsyncIOMotorClient(MONGO_URI)
+# ---------------------------
+# 🔹 MongoDB Connection (from Koyeb env var)
+# ---------------------------
+MONGO_URL = os.environ["MONGO_URL"]  # must be set in Koyeb
+mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
 
-db = client["autofilter_bot"]
+db = mongo_client["autofilter"]
+settings_col = db["settings"]
 
-# Collections
-settings_col = db["settings"]        # global settings (single document)
-chat_settings_col = db["chat_settings"]  # per chat settings
-
-
-# -------------------------------
-# Global settings (single document)
-# -------------------------------
+# ---------------------------
+# 🔹 GLOBAL SETTINGS
+# ---------------------------
 async def get_global_settings():
-    """Return global settings as a dict (create if missing)."""
+    """
+    Return global settings (singleton doc with _id='global').
+    Ensures the doc always exists.
+    """
     doc = await settings_col.find_one({"_id": "global"})
     if not doc:
-        doc = {"_id": "global"}
+        doc = {
+            "_id": "global",
+            "startmsg": "👋 Hello! I’m your AutoFilter Bot.",
+            "startpic": None,
+            "caption": None,
+        }
         await settings_col.insert_one(doc)
     return doc
 
 
-async def update_global_setting(key, value):
-    """Update one key in global settings."""
+async def update_global_setting(key: str, value):
+    """
+    Update one global setting key/value.
+    Example: await update_global_setting("startmsg", "New welcome message")
+    """
     await settings_col.update_one(
         {"_id": "global"},
         {"$set": {key: value}},
         upsert=True
     )
 
-
-# -------------------------------
-# Per-chat settings
-# -------------------------------
+# ---------------------------
+# 🔹 PER-CHAT SETTINGS (for groups/channels)
+# ---------------------------
 async def get_settings(chat_id: int):
-    """Return settings for a specific chat (create if missing)."""
-    doc = await chat_settings_col.find_one({"_id": chat_id})
+    """
+    Return settings for a specific chat.
+    Ensures the doc always exists.
+    """
+    doc = await settings_col.find_one({"_id": str(chat_id)})
     if not doc:
-        doc = {"_id": chat_id}
-        await chat_settings_col.insert_one(doc)
+        doc = {
+            "_id": str(chat_id),
+            "caption": None,
+            "filters": {},
+        }
+        await settings_col.insert_one(doc)
     return doc
 
 
 async def update_setting(chat_id: int, key: str, value):
-    """Update one key in a specific chat’s settings."""
-    await chat_settings_col.update_one(
-        {"_id": chat_id},
-        {"$set": {key: value}},
-        upsert=True
-    )        {"$set": {key: value}},
-        upsert=True
-    )
-
-# ---------------- CHAT SETTINGS ---------------- #
-async def get_settings(chat_id: int) -> dict:
-    data = await settings_col.find_one({"chat_id": chat_id})
-    if not data:
-        data = {
-            "chat_id": chat_id,
-            "caption": "",
-            "branding": "",
-            "force_sub": False,
-            "force_msg": "",
-            "short_mode": False,
-            "short_det": "",
-            "autodelete": False,
-            "sticker": "",
-            "start_pic": "",
-            "start_msg": "",
-            "db_channels": [],
-            "dest_channels": [],
-            "update_channels": []
-        }
-        await settings_col.insert_one(data)
-    return data
-
-async def update_setting(chat_id: int, key: str, value):
+    """
+    Update a setting for a specific chat.
+    Example: await update_setting(chat_id, "caption", "My custom caption")
+    """
     await settings_col.update_one(
-        {"chat_id": chat_id},
+        {"_id": str(chat_id)},
         {"$set": {key: value}},
         upsert=True
     )
-
-# ---------------- FILES ---------------- #
-async def add_file(file_id: str, name: str, size: int, caption: str = ""):
-    await files_col.insert_one({
-        "file_id": file_id,
-        "name": name,
-        "size": size,
-        "caption": caption
-    })
-
-async def get_file(file_id: str):
-    return await files_col.find_one({"file_id": file_id})
-
-# ---------------- POSTS ---------------- #
-async def add_post(post_id: int, chat_id: int, title: str, caption: str = ""):
-    await posts_col.insert_one({
-        "post_id": post_id,
-        "chat_id": chat_id,
-        "title": title,
-        "caption": caption
-    })
-
-async def get_post(post_id: int):
-    return await posts_col.find_one({"post_id": post_id})
-
-# ---------------- SERIES ---------------- #
-async def add_series(series_id: int, chat_id: int, title: str, episodes: list):
-    await series_col.insert_one({
-        "series_id": series_id,
-        "chat_id": chat_id,
-        "title": title,
-        "episodes": episodes
-    })
-
-async def get_series(series_id: int):
-    return await series_col.find_one({"series_id": series_id})
-
-# ---------------- USERS ---------------- #
-async def add_user(user_id: int, name: str = ""):
-    await users_col.update_one(
-        {"user_id": user_id},
-        {"$set": {"name": name}},
-        upsert=True
-    )
-
-async def get_user(user_id: int):
-    return await users_col.find_one({"user_id": user_id})
-
-# ---------------- CHANNELS ---------------- #
-async def add_channel(chat_id: int, title: str, type_: str = "db"):
-    """type_ = db / dest / update"""
-    await channels_col.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"title": title, "type": type_}},
-        upsert=True
-    )
-
-async def get_channels(type_: str = None):
-    if type_:
-        return await channels_col.find({"type": type_}).to_list(None)
-    return await channels_col.find().to_list(None)
