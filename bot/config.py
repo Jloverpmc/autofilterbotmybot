@@ -1,39 +1,35 @@
+# bot/config.py
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 def _to_bool(v):
-    if v is None: return False
-    return str(v).strip().lower() in ("1","true","yes","on","y")
+    return str(v).lower() in ("1","true","yes","on","y")
 
-API_ID = int(os.getenv("API_ID","18799477"))
-API_HASH = os.getenv("API_HASH","305cfa73e8b06daa97573809532034e5")
-BOT_TOKEN = os.getenv("BOT_TOKEN","6596235517:AAEgfj6Lhrh99QWM6z_9KoRN33ObGolvxN0")
+API_ID = int(os.getenv("API_ID", "0"))
+API_HASH = os.getenv("API_HASH", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
-# MongoDB (optional)
-MONGO_URI = os.getenv("MONGO_URI","")   # e.g. mongodb+srv://...
-DB_NAME = os.getenv("DB_NAME","autofilter_bot")
+# MongoDB
+MONGO_URI = os.getenv("MONGO_URI", "")  # e.g. mongodb+srv://user:pass@cluster/db
+DB_NAME = os.getenv("DB_NAME", "telegram_sharebot")
 
-# Admin IDs (space-separated) ✅ Fixed: use list instead of set
-ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS","5781922761").split() if x.strip().isdigit()]
+# Admins (space separated)
+ADMIN_IDS = {int(x) for x in (os.getenv("ADMIN_IDS","").split()) if x.isdigit()}
 
-# Bot basics
-BOT_NAME = os.getenv("BOT_NAME","AutoFilterBot")
-BRANDING = os.getenv("BRANDING","")   # will be inserted into captions as {branding}
+# Branding defaults
+DEFAULT_BRANDING = os.getenv("BRANDING", "")
 
-# Force subscribe defaults (can be changed in settings)
-FORCE_SUB_ENABLED = _to_bool(os.getenv("FORCE_SUB_ENABLED","false"))
-FORCE_CHANNEL = os.getenv("FORCE_CHANNEL","")   # @channelusername or -100id
-FORCE_MODE = os.getenv("FORCE_MODE","join")     # "join" or "request"
-FORCE_MSG = os.getenv("FORCE_MSG","Please join the channel to use this bot.")
+# Auto delete defaults (seconds)
+DEFAULT_AUTODELETE_SECONDS = int(os.getenv("DEFAULT_AUTODELETE_SECONDS", "1800"))
+DEFAULT_AUTODELETE_NOTE = os.getenv("DEFAULT_AUTODELETE_NOTE", "⚠️ This file will be auto-deleted in {autodelete_time}.")
+DEFAULT_AUTODELETE_EXPIRED = os.getenv("DEFAULT_AUTODELETE_EXPIRED", "❌ The file has been deleted after {autodelete_time}.")
 
-# Auto-delete defaults
-DEFAULT_AUTODELETE_SECONDS = int(os.getenv("DEFAULT_AUTODELETE_SECONDS","1800"))
-DEFAULT_AUTODELETE_NOTE = os.getenv("DEFAULT_AUTODELETE_NOTE","⚠️ This file will be auto-deleted in {autodelete_time}.")
-DEFAULT_AUTODELETE_EXPIRED = os.getenv("DEFAULT_AUTODELETE_EXPIRED","❌ The file has been deleted after {autodelete_time}.")
-
-# Shortener defaults
+# Shortener placeholders
 SHORT_ENABLED = _to_bool(os.getenv("SHORT_ENABLED","false"))
-SHORT_PROVIDER = os.getenv("SHORT_PROVIDER","custom")  # bitly|custom|gplinks|droplink
+SHORT_PROVIDER = os.getenv("SHORT_PROVIDER","custom")  # bitly|custom
 SHORT_API_URL = os.getenv("SHORT_API_URL","")
 SHORT_API_KEY = os.getenv("SHORT_API_KEY","")
+
+# Other
+LOG_CHANNEL = os.getenv("LOG_CHANNEL", "")  # optional
