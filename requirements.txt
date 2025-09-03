@@ -1,8 +1,6 @@
-aiohttp
 pyrogram==2.0.106
-tgcrypto
-motor
-pymongo
-python-dotenv
-requests
-Flask
+tgcrypto==1.2.5
+motor==3.4.0
+python-dotenv==1.0.1
+requests==2.32.3
+aiohttp==3.8.4
