@@ -1,131 +1,105 @@
+# bot/plugins/settings.py
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from bot.database.store import get_settings, update_setting
-import bot.config as config
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from bot.database.store import get_global_settings, update_global_setting, update_global_setting as update_setting
 import json
-
-# Side-by-side buttons helper
-def row_buttons(*args):
-    return [InlineKeyboardButton(text, callback_data=data) for text, data in args]
+import bot.config as config
 
 def settings_kb():
     return InlineKeyboardMarkup([
-        row_buttons(("📂 DB Channels","settings:db"), ("📢 Dest Channels","settings:dest")),
-        row_buttons(("🔔 Updates Channels","settings:updates"), ("🚦 Force Subscribe","settings:forcesub")),
-        row_buttons(("🏷️ Caption","settings:caption"), ("✨ Branding","settings:branding")),
-        row_buttons(("🔗 Short Det","settings:shortdet"), ("🔗 Short Mode","settings:shortmode")),
-        row_buttons(("🗑 Auto Delete","settings:autodel"), ("❌ Close","settings:close"))
+        [InlineKeyboardButton("📂 DB Channels", callback_data="settings:db")],
+        [InlineKeyboardButton("📢 Dest Channels", callback_data="settings:dest")],
+        [InlineKeyboardButton("🔔 Updates Channels", callback_data="settings:updates")],
+        [InlineKeyboardButton("✨ Start Msg", callback_data="settings:startmsg")],
+        [InlineKeyboardButton("🖼 Start Pic", callback_data="settings:startpic")],
+        [InlineKeyboardButton("🔒 Force Sub", callback_data="settings:forcesub")],
+        [InlineKeyboardButton("📑 Force Msg", callback_data="settings:forcemsg")],
+        [InlineKeyboardButton("🔗 Short Det", callback_data="settings:shortdet")],
+        [InlineKeyboardButton("⚡ Short Mode", callback_data="settings:shortmode")],
+        [InlineKeyboardButton("📝 Caption", callback_data="settings:caption")],
+        [InlineKeyboardButton("🎯 Branding", callback_data="settings:branding")],
+        [InlineKeyboardButton("🎭 Sticker", callback_data="settings:sticker")],
+        [InlineKeyboardButton("🧹 Auto Delete", callback_data="settings:autodelete")],
+        [InlineKeyboardButton("❌ Close", callback_data="settings:close")],
     ])
 
-# Admin-only settings command
-@Client.on_message(filters.private & filters.command("settings") & filters.user(lambda uid: uid in config.ADMIN_IDS))
-async def settings_main(bot, message):
-    await message.reply("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
+@Client.on_message(filters.command("settings") & filters.user(lambda uid: uid in config.ADMIN_IDS))
+async def settings_cmd(bot: Client, message: Message):
+    gs = await get_global_settings()
+    await message.reply_text("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
 
-# Callback router
-@Client.on_callback_query(filters.regex(r'^settings:'))
-async def settings_router(bot, query):
+# We'll use a simple in-memory pending map to know what admin is replying to
+_pending = {}  # admin_id -> key awaiting
+
+@Client.on_callback_query(filters.regex(r"^settings:"))
+async def settings_cb(bot, query):
     key = query.data.split(":",1)[1]
-    s = await get_settings()
-
-    # Always handle back/close buttons safely
-    if key == "root":
-        return await query.message.edit("⚙️ Please choose the setting you want to update:", reply_markup=settings_kb())
     if key == "close":
-        return await query.message.edit("Settings closed.")
+        await query.message.delete()
+        return
+    prompts = {
+        "db": "📂 Send DB channel ids (comma separated).",
+        "dest": "📢 Send destination channel ids (comma separated).",
+        "updates": "🔔 Send updates channel id or link.",
+        "startmsg": "✨ Send Start Message (text/html).",
+        "startpic": "🖼 Send Start Picture now (photo or URL).",
+        "forcesub": "🔒 Send Force Sub channel (username with @ or -100id). Leave blank to disable.",
+        "forcemsg": "📑 Send Force Subscribe message.",
+        "shortdet": "🔗 Send Shortener details as JSON: {\"provider\":\"custom\",\"api_url\":\"...\",\"api_key\":\"...\"}",
+        "shortmode": "⚡ Send 'on' or 'off' to toggle short mode.",
+        "caption": "📝 Send caption template. Use variables: {filename} {size} {duration} {quality} {language} {subtitle} {episode} {season} {branding}",
+        "branding": "🏷 Send branding/footer text.",
+        "sticker": "🎭 Send sticker now.",
+        "autodelete": "🧹 Send auto-delete seconds (0 to disable).",
+    }
+    await query.message.edit(prompts.get(key, "Send value:"))
+    _pending[query.from_user.id] = key
+    await query.answer()
 
-    # Caption
-    if key == "caption":
-        current = s.get("caption_template") or "❌ Not set"
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✍️ Set / Update", callback_data="caption:set"),
-             InlineKeyboardButton("🗑 Reset", callback_data="caption:reset")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
-        text = ("📝 Caption Template\n\nUse variables:\n{filename} {size} {duration} {quality} {language} {subtitle} {episode} {season} {branding}\n\n"
-                f"Current:\n<code>{current}</code>")
-        return await query.message.edit(text, reply_markup=kb)
+@Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
+async def settings_reply(bot: Client, message: Message):
+    admin = message.from_user.id
+    if admin not in _pending:
+        return
+    key = _pending.pop(admin)
+    val = None
 
-    # Branding
-    if key == "branding":
-        current = s.get("branding") or "❌ Not set"
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✍️ Set / Update", callback_data="branding:set"),
-             InlineKeyboardButton("🗑 Reset", callback_data="branding:reset")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
-        return await query.message.edit(f"✨ Branding\n\nCurrent:\n<code>{current}</code>", reply_markup=kb)
-
-    # Auto-delete
-    if key == "autodel":
-        secs = s.get("autodelete_seconds") or config.DEFAULT_AUTODELETE_SECONDS
-        note = s.get("autodelete_note") or config.DEFAULT_AUTODELETE_NOTE
-        expired = s.get("autodelete_expired") or config.DEFAULT_AUTODELETE_EXPIRED
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏱ Set Seconds", callback_data="autodel:setsecs"),
-             InlineKeyboardButton("✍️ Note (before)", callback_data="autodel:setnote")],
-            [InlineKeyboardButton("✍️ Message (after)", callback_data="autodel:setexpired")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
-        text = (f"🗑 Auto Delete Settings\n\nTime (seconds): <code>{secs}</code>\nBefore-note: <code>{note}</code>\nAfter-msg: <code>{expired}</code>")
-        return await query.message.edit(text, reply_markup=kb)
-
-    # Force subscribe
-    if key == "forcesub":
-        fs = s.get("force_sub") or {}
-        enabled = bool(fs and fs.get("channel"))
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Set / Change Channel", callback_data="forcesub:set"),
-             InlineKeyboardButton("❌ Disable", callback_data="forcesub:disable")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
-        current = f"Enabled: {fs.get('channel')} ({fs.get('mode')})" if enabled else "Disabled"
-        return await query.message.edit(f"🚦 Force Subscribe\n\nCurrent: {current}", reply_markup=kb)
-
-    # Shortener
-    if key == "shortdet":
-        conf = s.get("shortener") or {}
-        text = ("🔗 Shortener Details\n\n"
-                f"Enabled: <code>{conf.get('enabled')}</code>\n"
-                f"Provider: <code>{conf.get('provider')}</code>\n"
-                f"API URL: <code>{conf.get('api_url') or '-'}</code>\n"
-                f"API KEY: <code>{'****' if conf.get('api_key') else '-'}</code>\n"
-                f"Extra JSON: <code>{json.dumps(conf.get('extra') or {}, ensure_ascii=False)}</code>")
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✍️ Set Provider", callback_data="short:setprov"),
-             InlineKeyboardButton("✍️ Set API URL", callback_data="short:seturl")],
-            [InlineKeyboardButton("✍️ Set API KEY", callback_data="short:setkey"),
-             InlineKeyboardButton("✍️ Set Extra JSON", callback_data="short:setextra")],
-            [InlineKeyboardButton("⬅ Back", callback_data="settings:root")]
-        ])
-        return await query.message.edit(text, reply_markup=kb)
-
-    if key == "shortmode":
-        conf = s.get("shortener") or {}
-        enabled = conf.get("enabled", False)
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔘 Toggle ON/OFF", callback_data="short:toggle"),
-                                    InlineKeyboardButton("⬅ Back", callback_data="settings:root")]])
-        return await query.message.edit(f"🔗 Short Mode is: <b>{'ON' if enabled else 'OFF'}</b>", reply_markup=kb)
-
-    # Fallback
-    return await query.message.edit("🔧 Section not implemented yet.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back", callback_data="settings:root")]]))
-
-# Capture replies for admin only
-@Client.on_message(filters.private & filters.text & filters.user(lambda uid: uid in config.ADMIN_IDS))
-async def capture_text(bot, message):
-    if getattr(bot, "caption_wait", None) == message.from_user.id:
-        await update_setting("caption_template", message.text)
-        bot.caption_wait = None
-        return await message.reply("✅ Caption template updated.")
-    if getattr(bot, "branding_wait", None) == message.from_user.id:
-        await update_setting("branding", message.text)
-        bot.branding_wait = None
-        return await message.reply("✅ Branding updated.")
-    if getattr(bot, "autodel_secs_wait", None) == message.from_user.id:
+    # media handling
+    if key == "startpic":
+        if message.photo:
+            val = message.photo.file_id
+        else:
+            val = message.text or message.caption
+    elif key == "sticker":
+        if message.sticker:
+            val = message.sticker.file_id
+        else:
+            val = message.text
+    elif key == "shortdet":
+        # expect json
         try:
-            secs = int(message.text.strip())
-        except:
-            return await message.reply("❌ Invalid number.")
-        await update_setting("autodelete_seconds", secs)
-        bot.autodel_secs_wait = None
-        return await message.reply(f"✅ Auto delete set to {secs} seconds.")
+            val = json.loads(message.text)
+        except Exception:
+            await message.reply("❌ Invalid JSON. Send again.")
+            _pending[admin] = key
+            return
+    elif key == "autodelete":
+        try:
+            val = int(message.text.strip())
+        except Exception:
+            await message.reply("❌ Invalid number. Send integer seconds.")
+            _pending[admin] = key
+            return
+    elif key in ("db","dest","updates"):
+        # comma separated list
+        text = message.text or ""
+        items = [x.strip() for x in text.split(",") if x.strip()]
+        val = items
+    elif key == "shortmode":
+        val = (message.text.strip().lower() in ("on","1","true","yes","y"))
+    else:
+        val = message.text or message.caption or ""
+
+    # update global settings in DB
+    await update_setting(key, val)
+    await message.reply(f"✅ Updated `{key}`.", reply_markup=settings_kb())
