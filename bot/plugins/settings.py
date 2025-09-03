@@ -1,3 +1,4 @@
+# bot/plugins/settings.py
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from bot.database.store import get_global_settings, update_global_setting
@@ -25,8 +26,7 @@ def settings_kb():
 # Track pending admin prompts
 _pending = {}  # {admin_id: key_waiting}
 
-# ✅ Fix: Allow /settings in private also
-@Client.on_message(filters.command("settings") & filters.private & filters.user(config.ADMIN_IDS))
+@Client.on_message(filters.command("settings") & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def settings_cmd(bot: Client, message: Message):
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
@@ -38,8 +38,10 @@ async def settings_cmd(bot: Client, message: Message):
 async def settings_cb(bot, query):
     key = query.data.split(":", 1)[1]
     if key == "close":
+        await query.answer("❌ Closed settings.", show_alert=False)
         await query.message.delete()
         return
+
     prompts = {
         "db": "📂 Send DB channel IDs (comma separated).",
         "dest": "📢 Send destination channel IDs (comma separated).",
@@ -55,11 +57,17 @@ async def settings_cb(bot, query):
         "sticker": "🎭 Send sticker.",
         "autodelete": "🧹 Send auto-delete seconds (0 = disable).",
     }
-    await query.message.edit(prompts.get(key, "Send value:"))
-    _pending[query.from_user.id] = key
-    await query.answer()
 
-@Client.on_message(filters.private & filters.user(config.ADMIN_IDS))
+    # Always answer first (fixes infinite loading)
+    await query.answer("✏️ Send new value in chat.")
+
+    # Then edit the message with prompt
+    await query.message.edit_text(prompts.get(key, "Send value:"))
+
+    # Track pending key
+    _pending[query.from_user.id] = key
+
+@Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def settings_reply(bot: Client, message: Message):
     admin = message.from_user.id
     if admin not in _pending:
