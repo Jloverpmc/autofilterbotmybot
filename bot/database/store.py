@@ -2,21 +2,44 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+# Use MONGO_URI from environment only
+MONGO_URI = os.environ["MONGO_URI"]
+
 client = AsyncIOMotorClient(MONGO_URI)
 db = client["autofilterbot"]
 
 # Collections
 settings_col = db["settings"]
+global_col = db["global"]
 files_col = db["files"]
 posts_col = db["posts"]
 series_col = db["series"]
 users_col = db["users"]
 channels_col = db["channels"]
 
-# ---------------- SETTINGS ---------------- #
+# ---------------- GLOBAL SETTINGS ---------------- #
+async def get_global_settings() -> dict:
+    """Return global settings (single document)."""
+    data = await global_col.find_one({"_id": "global"})
+    if not data:
+        data = {
+            "_id": "global",
+            "broadcast": True,
+            "maintenance": False,
+            "admins": []
+        }
+        await global_col.insert_one(data)
+    return data
+
+async def update_global_setting(key: str, value):
+    await global_col.update_one(
+        {"_id": "global"},
+        {"$set": {key: value}},
+        upsert=True
+    )
+
+# ---------------- CHAT SETTINGS ---------------- #
 async def get_settings(chat_id: int) -> dict:
-    """Fetch settings for a chat. Returns default if not found."""
     data = await settings_col.find_one({"chat_id": chat_id})
     if not data:
         data = {
@@ -39,7 +62,6 @@ async def get_settings(chat_id: int) -> dict:
     return data
 
 async def update_setting(chat_id: int, key: str, value):
-    """Update a single setting field."""
     await settings_col.update_one(
         {"chat_id": chat_id},
         {"$set": {key: value}},
