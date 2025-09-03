@@ -26,12 +26,19 @@ def settings_kb():
 # Track pending admin prompts
 _pending = {}  # {admin_id: key_waiting}
 
-@Client.on_message(filters.command("settings") & filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
+@Client.on_message(filters.command("settings") & filters.private)
 async def settings_cmd(bot: Client, message: Message):
+    # Manual admin check
+    if message.from_user.id not in config.ADMIN_IDS:
+        return await message.reply_text("❌ You are not allowed to use this command.")
+
+    print("✅ /settings command received from:", message.from_user.id)
+
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
     for k, v in gs.items():
         text += f"• **{k}** = `{v}`\n"
+
     await message.reply_text(text, reply_markup=settings_kb())
 
 @Client.on_callback_query(filters.regex(r"^settings:"))
