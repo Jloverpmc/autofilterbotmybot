@@ -1,35 +1,33 @@
-import sys
+# bot/main.py
+
+import logging
 from pyrogram import Client
-import bot.config as config
-import asyncio
 
-def check_config():
-    miss = []
-    if not config.API_ID:
-        miss.append("API_ID")
-    if not config.API_HASH:
-        miss.append("API_HASH")
-    if not config.BOT_TOKEN:
-        miss.append("BOT_TOKEN")
-    if miss:
-        print("[!] Missing config values:", ", ".join(miss))
-        sys.exit(1)
+# Enable logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-check_config()
+try:
+    import bot.config as config
+    from bot.plugins import *
+    from bot.database import store
+except Exception as e:
+    logging.error(f"❌ Import error: {e}")
 
+# Initialize client
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
-    plugins=dict(root="bot/plugins")  # Only load plugins folder
+    plugins=dict(root="bot/plugins")
 )
 
-async def keep_alive():
-    # Keep Koyeb web service alive
-    while True:
-        await asyncio.sleep(60)
-
 if __name__ == "__main__":
-    print("🚀 Telegram AutoFilter Bot starting...")
-    app.run(keep_alive())
+    try:
+        print("🚀 Telegram AutoFilter Bot starting...")
+        app.run()
+    except Exception as e:
+        logging.error(f"❌ Bot crashed: {e}")
