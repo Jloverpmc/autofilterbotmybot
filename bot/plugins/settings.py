@@ -25,7 +25,8 @@ def settings_kb():
 # Track pending admin prompts
 _pending = {}  # {admin_id: key_waiting}
 
-@Client.on_message(filters.command("settings") & filters.user(lambda uid: uid in config.ADMIN_IDS))
+# ✅ Fix: Allow /settings in private also
+@Client.on_message(filters.command("settings") & filters.private & filters.user(config.ADMIN_IDS))
 async def settings_cmd(bot: Client, message: Message):
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
@@ -58,7 +59,7 @@ async def settings_cb(bot, query):
     _pending[query.from_user.id] = key
     await query.answer()
 
-@Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
+@Client.on_message(filters.private & filters.user(config.ADMIN_IDS))
 async def settings_reply(bot: Client, message: Message):
     admin = message.from_user.id
     if admin not in _pending:
