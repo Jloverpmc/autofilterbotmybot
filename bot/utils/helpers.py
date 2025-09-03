@@ -1,16 +1,7 @@
+# bot/utils/helpers.py
 import asyncio
 from typing import Dict
-from bot.database.store import get_settings
-from bot.config import DEFAULT_AUTODELETE_SECONDS, DEFAULT_AUTODELETE_NOTE, DEFAULT_AUTODELETE_EXPIRED
-
-async def schedule_auto_delete(bot, chat_id: int, message_id: int, seconds: int, expired_text: str):
-    try:
-        await asyncio.sleep(seconds)
-        await bot.delete_messages(chat_id, message_id)
-        if expired_text:
-            await bot.send_message(chat_id, expired_text)
-    except Exception:
-        pass
+from datetime import timedelta
 
 def format_autodelete_time(seconds: int) -> str:
     if seconds < 60:
@@ -24,10 +15,18 @@ def format_autodelete_time(seconds: int) -> str:
     days = hours // 24
     return f"{days} days"
 
+async def schedule_auto_delete(bot, chat_id: int, message_id: int, seconds: int, expired_text: str = None):
+    try:
+        await asyncio.sleep(seconds)
+        await bot.delete_messages(chat_id, message_id)
+        if expired_text:
+            await bot.send_message(chat_id, expired_text)
+    except Exception:
+        pass
+
 def fill_caption(template: str, meta: Dict[str, str]) -> str:
     if not template:
         return ""
     for key in ["filename","size","duration","quality","language","subtitle","episode","season","branding"]:
-        template = template.replace("{"+key+"}", str(meta.get(key, "")))
+        template = template.replace("{" + key + "}", str(meta.get(key, "")))
     return template
-    
