@@ -15,7 +15,7 @@ MONGO_URI = os.getenv("MONGO_URI", "")  # e.g. mongodb+srv://user:pass@cluster/d
 DB_NAME = os.getenv("DB_NAME", "telegram_sharebot")
 
 # Admins (space separated)
-ADMIN_IDS = {int(x) for x in (os.getenv("ADMIN_IDS","").split()) if x.isdigit()}
+ADMIN_IDS = [int(x) for x in (os.getenv("ADMIN_IDS", "").split()) if x.isdigit()]
 
 # Branding defaults
 DEFAULT_BRANDING = os.getenv("BRANDING", "")
