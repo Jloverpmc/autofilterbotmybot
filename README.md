@@ -1,5 +1,9 @@
-Telegram AutoFilter Bot
-- Fill bot/config.py or .env with API_ID/API_HASH/BOT_TOKEN and MONGO_URI
-- Set ADMIN_IDS environment variable (space separated)
-- pip install -r requirements.txt
-- python -m bot.main
+Telegram ShareBot - deployable scaffold.
+
+Fill environment variables (or edit bot/config.py) with API_ID, API_HASH, BOT_TOKEN, MONGO_URI, ADMIN_IDS.
+
+Install:
+pip install -r requirements.txt
+
+Run:
+python -m bot.main
