@@ -1,59 +1,44 @@
-from typing import Dict, Any
+# bot/database/store.py
+from motor.motor_asyncio import AsyncIOMotorClient
 import bot.config as config
+from typing import Dict, Any
 
-# try Motor (async Mongo) if MONGO_URI present
+_client = None
 _db = None
-try:
-    if config.MONGO_URI:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        _client = AsyncIOMotorClient(config.MONGO_URI)
-        _db = _client[config.DB_NAME]
-except Exception:
-    _db = None
+if config.MONGO_URI:
+    _client = AsyncIOMotorClient(config.MONGO_URI)
+    _db = _client[config.DB_NAME]
 
-# in-memory fallback
-_mem = {
-    "settings": {
-        "caption_template": None,
-        "branding": config.BRANDING or "",
-        "autodelete_seconds": None,
-        "autodelete_note": None,
-        "autodelete_expired": None,
-        "force_sub": {"channel": config.FORCE_CHANNEL, "mode": config.FORCE_MODE},
-        "shortener": {"enabled": config.SHORT_ENABLED, "provider": config.SHORT_PROVIDER, "api_url": config.SHORT_API_URL, "api_key": config.SHORT_API_KEY, "extra": {}},
-        "dest_channels": [],
-        "updates_channels": [],
-        "db_channels": [],
-        "start_text": None,
-        "start_pic": None
-    },
-    "users": set()
-}
+# SETTINGS stored as single doc with _id = "global"
+async def get_global_settings() -> Dict[str, Any]:
+    if not _db:
+        return {}
+    doc = await _db.settings.find_one({"_id": "global"})
+    return doc.get("data", {}) if doc else {}
 
-async def get_settings() -> Dict[str, Any]:
-    if _db:
-        doc = await _db.settings.find_one({"_id":"global"}) or {}
-        return doc.get("data", {})
-    return _mem["settings"]
+async def set_global_settings(data: Dict[str, Any]):
+    if not _db:
+        return
+    await _db.settings.update_one({"_id": "global"}, {"$set": {"data": data}}, upsert=True)
 
-async def set_settings(data: Dict[str, Any]):
-    if _db:
-        await _db.settings.update_one({"_id":"global"},{"$set":{"data":data}}, upsert=True)
-    else:
-        _mem["settings"] = data
+async def update_global_setting(key: str, value):
+    s = await get_global_settings()
+    s[key] = value
+    await set_global_settings(s)
 
-async def update_setting(k, v):
-    s = await get_settings()
-    s[k] = v
-    await set_settings(s)
+# Per-user settings (admins / storing preferences)
+async def get_user_settings(user_id: int) -> Dict[str, Any]:
+    if not _db:
+        return {}
+    doc = await _db.user_settings.find_one({"_id": user_id})
+    return doc.get("data", {}) if doc else {}
 
-async def add_user(uid:int):
-    if _db:
-        await _db.users.update_one({"_id":uid},{"$set":{"_id":uid}}, upsert=True)
-    else:
-        _mem["users"].add(uid)
+async def set_user_settings(user_id: int, data: Dict[str, Any]):
+    if not _db:
+        return
+    await _db.user_settings.update_one({"_id": user_id}, {"$set": {"data": data}}, upsert=True)
 
-async def count_users() -> int:
-    if _db:
-        return await _db.users.count_documents({})
-    return len(_mem["users"])
+async def update_user_setting(user_id: int, key: str, value):
+    s = await get_user_settings(user_id)
+    s[key] = value
+    await set_user_settings(user_id, s)
