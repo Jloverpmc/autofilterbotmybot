@@ -2,39 +2,56 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 
-# Use MONGO_URI from environment only
-MONGO_URI = os.environ["MONGO_URI"]
-
+MONGO_URI = os.environ.get("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
-db = client["autofilterbot"]
+
+db = client["autofilter_bot"]
 
 # Collections
-settings_col = db["settings"]
-global_col = db["global"]
-files_col = db["files"]
-posts_col = db["posts"]
-series_col = db["series"]
-users_col = db["users"]
-channels_col = db["channels"]
+settings_col = db["settings"]        # global settings (single document)
+chat_settings_col = db["chat_settings"]  # per chat settings
 
-# ---------------- GLOBAL SETTINGS ---------------- #
-async def get_global_settings() -> dict:
-    """Return global settings (single document)."""
-    data = await global_col.find_one({"_id": "global"})
-    if not data:
-        data = {
-            "_id": "global",
-            "broadcast": True,
-            "maintenance": False,
-            "admins": []
-        }
-        await global_col.insert_one(data)
-    return data
 
-async def update_global_setting(key: str, value):
-    await global_col.update_one(
+# -------------------------------
+# Global settings (single document)
+# -------------------------------
+async def get_global_settings():
+    """Return global settings as a dict (create if missing)."""
+    doc = await settings_col.find_one({"_id": "global"})
+    if not doc:
+        doc = {"_id": "global"}
+        await settings_col.insert_one(doc)
+    return doc
+
+
+async def update_global_setting(key, value):
+    """Update one key in global settings."""
+    await settings_col.update_one(
         {"_id": "global"},
         {"$set": {key: value}},
+        upsert=True
+    )
+
+
+# -------------------------------
+# Per-chat settings
+# -------------------------------
+async def get_settings(chat_id: int):
+    """Return settings for a specific chat (create if missing)."""
+    doc = await chat_settings_col.find_one({"_id": chat_id})
+    if not doc:
+        doc = {"_id": chat_id}
+        await chat_settings_col.insert_one(doc)
+    return doc
+
+
+async def update_setting(chat_id: int, key: str, value):
+    """Update one key in a specific chat’s settings."""
+    await chat_settings_col.update_one(
+        {"_id": chat_id},
+        {"$set": {key: value}},
+        upsert=True
+    )        {"$set": {key: value}},
         upsert=True
     )
 
