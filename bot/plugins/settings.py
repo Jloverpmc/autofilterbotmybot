@@ -28,7 +28,6 @@ def settings_kb():
 # ---------------------------
 # MongoDB-backed pending
 # ---------------------------
-# Structure: {_id: admin_id, key: key_waiting}
 async def set_pending(admin_id: int, key: str):
     await update_global_setting(f"pending_{admin_id}", key)
 
@@ -50,7 +49,6 @@ async def settings_cmd(bot: Client, message: Message):
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
     for k, v in gs.items():
-        # skip internal pending keys
         if k.startswith("pending_"):
             continue
         text += f"• **{k}** = `{v}`\n"
@@ -90,12 +88,16 @@ async def settings_cb(bot, query):
 # ---------------------------
 # Handle admin reply
 # ---------------------------
-@Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
+@Client.on_message(
+    filters.private 
+    & filters.user(lambda uid: uid in config.ADMIN_IDS) 
+    & ~filters.command("settings")   # ✅ prevents blocking /settings
+)
 async def settings_reply(bot: Client, message: Message):
     admin = message.from_user.id
     key = await get_pending(admin)
     if not key:
-        return  # nothing waiting
+        return
 
     val = None
     try:
