@@ -1,47 +1,47 @@
 import os
-import uvicorn
-from fastapi import FastAPI
+import logging
 from pyrogram import Client
 from motor.motor_asyncio import AsyncIOMotorClient
-import asyncio
+from pyrogram import idle
 
-# ----------------------------
-# Vars from Environment
-# ----------------------------
+# Logging setup
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Environment variables
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URL = os.getenv("MONGO_URL")  # add in Koyeb vars
+MONGO_URL = os.getenv("MONGO_URL")  # from Koyeb env
 
-# ----------------------------
-# Telegram Bot with Mongo storage
-# ----------------------------
+# Initialize Telegram Bot
 app_bot = Client(
-    "my_bot",
+    "autofilter-bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    storage_uri=MONGO_URL  # <<< Use MongoDB for session
+    plugins=dict(root="bot/plugins")  # auto-load plugins
 )
 
-# ----------------------------
-# FastAPI for healthcheck
-# ----------------------------
-app = FastAPI()
+# Initialize MongoDB
+mongo_client = AsyncIOMotorClient(MONGO_URL)
+db = mongo_client["autofilter_bot"]  # database name
 
-@app.get("/")
-async def root():
-    return {"status": "running"}
+# MongoDB test
+async def check_mongo():
+    try:
+        await mongo_client.admin.command("ping")
+        logger.info("✅ MongoDB Connected Successfully")
+    except Exception as e:
+        logger.error(f"❌ MongoDB Connection Failed: {e}")
 
-# ----------------------------
-# Start bot & server
-# ----------------------------
-async def start_bot():
-    await app_bot.start()
-    print("🔹 Telegram Bot started...")
-
-loop = asyncio.get_event_loop()
-loop.create_task(start_bot())
-
+# Main
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
+    logger.info("🚀 Starting Telegram Bot...")
+    app_bot.start()
+    app_bot.loop.run_until_complete(check_mongo())
+    idle()  # keep the bot running
+    app_bot.stop()
