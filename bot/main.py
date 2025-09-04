@@ -1,29 +1,35 @@
 # bot/main.py
-
-import logging
 import asyncio
+import logging
 from pyrogram import Client
+from fastapi import FastAPI
+import uvicorn
 
 # ---------------------------
-# Logging
+# Logging (file + console)
 # ---------------------------
 logging.basicConfig(
+    filename="bot.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+logging.getLogger().addHandler(console_handler)
 
 # ---------------------------
-# Imports
+# Import bot modules
 # ---------------------------
 try:
     import bot.config as config
     from bot.plugins import *
-    from bot.database import store, files
 except Exception as e:
     logging.error(f"❌ Import error: {e}")
 
 # ---------------------------
-# Initialize Client
+# Initialize Pyrogram client
 # ---------------------------
 app = Client(
     "autofilter-bot",
@@ -34,31 +40,35 @@ app = Client(
 )
 
 # ---------------------------
-# Bot Startup
+# Health check HTTP server for Koyeb
 # ---------------------------
-async def start_bot():
-    print("🚀 Telegram AutoFilter Bot starting...")
+fastapi_app = FastAPI()
 
-    # Initialize file counter in MongoDB
-    await files.init_meta()
+@fastapi_app.get("/")
+async def health():
+    return {"status": "ok"}
 
-    # Start Pyrogram client
-    await app.start()
-    print("✅ Bot started")
-
-    # Keep the bot running indefinitely
-    stop_event = asyncio.Event()
-    try:
-        await stop_event.wait()
-    finally:
-        await app.stop()
-        print("🛑 Bot stopped")
+async def start_health_server():
+    """Run FastAPI server in background"""
+    config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=8080, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 # ---------------------------
-# Run
+# Run both bot and health server
 # ---------------------------
 if __name__ == "__main__":
+    async def main():
+        logging.info("🚀 Starting Telegram AutoFilter Bot...")
+        # Start health server in background
+        asyncio.create_task(start_health_server())
+        # Run Pyrogram bot
+        await app.start()
+        logging.info("✅ Bot started")
+        # Keep bot running forever
+        await asyncio.Event().wait()
+
     try:
-        asyncio.run(start_bot())
+        asyncio.run(main())
     except Exception as e:
         logging.error(f"❌ Bot crashed: {e}")
