@@ -2,7 +2,7 @@
 import bot.config as config
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
-    _db_client = AsyncIOMotorClient(config.MONGO_URI) if config.MONGO_URI else None
+    _db_client = AsyncIOMotorClient(config.MONGO_URL) if config.MONGO_URL else None
     _db = _db_client[config.DB_NAME] if _db_client else None
 except Exception:
     _db = None
