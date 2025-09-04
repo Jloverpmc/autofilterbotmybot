@@ -1,37 +1,52 @@
+# main.py
 import os
 import asyncio
 from fastapi import FastAPI
 from pyrogram import Client
 
-# ----- FastAPI App -----
-app = FastAPI()
+# =========================
+# Environment / Config
+# =========================
+API_ID = int(os.environ.get("API_ID", 12345))        # Replace with your API_ID
+API_HASH = os.environ.get("API_HASH", "your_api_hash")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "your_bot_token")
 
-# ----- Pyrogram Bot -----
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-API_ID = int(os.environ.get("API_ID", 0))
-API_HASH = os.environ.get("API_HASH")
+# Pyrogram client
+app_bot = Client(
+    "autofilter_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    plugins=dict(root="bot/plugins")   # Folder containing your plugins
+)
 
-bot = Client("autofilter-bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+# FastAPI app
+app = FastAPI(title="Telegram AutoFilter Bot")
 
-# ----- Startup Event -----
+# =========================
+# Startup / Shutdown
+# =========================
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Starting Telegram AutoFilter Bot...")
-    asyncio.create_task(bot.start())
+    print("🔹 Starting Telegram Bot...")
+    asyncio.create_task(app_bot.start())
 
-# ----- Shutdown Event -----
 @app.on_event("shutdown")
 async def shutdown_event():
-    await bot.stop()
-    print("🛑 Bot stopped.")
+    print("🔹 Stopping Telegram Bot...")
+    await app_bot.stop()
 
-# ----- Simple Health Check -----
+# =========================
+# Simple health check route
+# =========================
 @app.get("/")
 async def root():
-    return {"status": "Bot is running"}
+    return {"status": "AutoFilter Bot is running!"}
 
-# ----- Run Uvicorn -----
+# =========================
+# Run directly (optional)
+# =========================
 if __name__ == "__main__":
     import uvicorn
-    PORT = int(os.environ.get("PORT", 8080))  # Use Koyeb port variable
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
