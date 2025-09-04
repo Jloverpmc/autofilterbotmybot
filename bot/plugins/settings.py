@@ -1,12 +1,11 @@
-# bot/plugins/settings.py
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from bot.database.store import get_global_settings, update_global_setting
 import json
 import bot.config as config
 
 # ---------------------------
-# Inline Keyboard
+# Keyboard
 # ---------------------------
 def settings_kb():
     return InlineKeyboardMarkup([
@@ -27,9 +26,18 @@ def settings_kb():
     ])
 
 # ---------------------------
-# Track pending admin prompts
+# MongoDB-backed pending
 # ---------------------------
-_pending = {}  # {admin_id: key_waiting}
+# Structure: {_id: admin_id, key: key_waiting}
+async def set_pending(admin_id: int, key: str):
+    await update_global_setting(f"pending_{admin_id}", key)
+
+async def get_pending(admin_id: int):
+    gs = await get_global_settings()
+    return gs.get(f"pending_{admin_id}")
+
+async def clear_pending(admin_id: int):
+    await update_global_setting(f"pending_{admin_id}", None)
 
 # ---------------------------
 # /settings command
@@ -38,24 +46,23 @@ _pending = {}  # {admin_id: key_waiting}
 async def settings_cmd(bot: Client, message: Message):
     if message.from_user.id not in config.ADMIN_IDS:
         return await message.reply_text("❌ You are not allowed to use this command.")
-
+    
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
     for k, v in gs.items():
+        # skip internal pending keys
+        if k.startswith("pending_"):
+            continue
         text += f"• **{k}** = `{v}`\n"
 
     await message.reply_text(text, reply_markup=settings_kb())
 
 # ---------------------------
-# Callback query handler
+# Callback buttons
 # ---------------------------
 @Client.on_callback_query(filters.regex(r"^settings:"))
-async def settings_cb(bot: Client, query: CallbackQuery):
-    if query.from_user.id not in config.ADMIN_IDS:
-        return await query.answer("❌ Not allowed.", show_alert=True)
-
-    await query.answer()  # stop "loading..." spinner
-
+async def settings_cb(bot, query):
+    await query.answer()
     key = query.data.split(":", 1)[1]
     if key == "close":
         await query.message.delete()
@@ -78,31 +85,24 @@ async def settings_cb(bot: Client, query: CallbackQuery):
     }
 
     await query.message.reply_text(prompts.get(key, "Send value:"))
-    _pending[query.from_user.id] = key
+    await set_pending(query.from_user.id, key)
 
 # ---------------------------
-# Handle admin replies
+# Handle admin reply
 # ---------------------------
 @Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def settings_reply(bot: Client, message: Message):
     admin = message.from_user.id
-    if admin not in _pending:
-        return
+    key = await get_pending(admin)
+    if not key:
+        return  # nothing waiting
 
-    key = _pending.pop(admin)
     val = None
-
     try:
         if key == "startpic":
-            if message.photo:
-                val = message.photo.file_id
-            else:
-                val = message.text or message.caption
+            val = message.photo.file_id if message.photo else message.text or message.caption
         elif key == "sticker":
-            if message.sticker:
-                val = message.sticker.file_id
-            else:
-                val = message.text
+            val = message.sticker.file_id if message.sticker else message.text
         elif key == "shortdet":
             val = json.loads(message.text)
         elif key == "autodelete":
@@ -117,8 +117,8 @@ async def settings_reply(bot: Client, message: Message):
             val = message.text or message.caption or ""
     except Exception as e:
         await message.reply(f"❌ Invalid input: {e}\nPlease try again.")
-        _pending[admin] = key
         return
 
     await update_global_setting(key, val)
+    await clear_pending(admin)
     await message.reply(f"✅ Updated **{key}**.", reply_markup=settings_kb())
