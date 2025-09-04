@@ -1,9 +1,7 @@
-# bot/main.py
-
 import logging
 from pyrogram import Client
+import asyncio
 
-# Enable logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -12,11 +10,10 @@ logging.basicConfig(
 try:
     import bot.config as config
     from bot.plugins import *
-    from bot.database import store
+    from bot.database import store, files
 except Exception as e:
     logging.error(f"❌ Import error: {e}")
 
-# Initialize client
 app = Client(
     "autofilter-bot",
     api_id=config.API_ID,
@@ -25,9 +22,17 @@ app = Client(
     plugins=dict(root="bot/plugins")
 )
 
+async def start_bot():
+    print("🚀 Telegram AutoFilter Bot starting...")
+    await files.init_meta()  # Initialize file counter
+    await app.start()
+    print("✅ Bot started")
+    await app.idle()
+    await app.stop()
+    print("🛑 Bot stopped")
+
 if __name__ == "__main__":
     try:
-        print("🚀 Telegram AutoFilter Bot starting...")
-        app.run()
+        asyncio.run(start_bot())
     except Exception as e:
         logging.error(f"❌ Bot crashed: {e}")
