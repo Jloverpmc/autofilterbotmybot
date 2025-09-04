@@ -1,52 +1,46 @@
 import os
-import logging
-from pyrogram import Client, filters
-from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
 from fastapi import FastAPI
 import uvicorn
+from pyrogram import Client
+import bot.config as config
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ---------------------------
+# FastAPI app (for Koyeb healthcheck)
+# ---------------------------
+api = FastAPI()
 
-# Load environment variables
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URL = os.getenv("MONGO_URL")  # ✅ Now reads from MONGO_URL
+@api.get("/")
+async def root():
+    return {"status": "ok", "message": "Bot is alive"}
 
-# Telegram Bot client
-app = Client(
-    "autofilterbot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+# ---------------------------
+# Pyrogram Client
+# ---------------------------
+bot = Client(
+    "autofilter_bot",
+    api_id=config.API_ID,
+    api_hash=config.API_HASH,
+    bot_token=config.BOT_TOKEN,
+    in_memory=True  # prevents sqlite session file issues
 )
 
-# MongoDB connection
-mongo_client = AsyncIOMotorClient(MONGO_URL)  # ✅ Use Koyeb Mongo URL
-db = mongo_client["autofilterdb"]  # you can rename if needed
+# ---------------------------
+# Startup: Run both Bot + FastAPI
+# ---------------------------
+async def main():
+    # Start Pyrogram bot
+    await bot.start()
+    print("✅ Bot started...")
 
-# FastAPI for health checks
-web = FastAPI()
+    # Start FastAPI server
+    config_port = int(os.environ.get("PORT", 8080))
+    config_host = "0.0.0.0"
 
-@web.get("/")
-async def root():
-    return {"status": "ok", "message": "Bot is running on Koyeb"}
-
-# Example command
-@app.on_message(filters.command("start"))
-async def start_cmd(client, message):
-    await message.reply_text("✅ Bot is alive and connected to MongoDB!")
+    server = uvicorn.Server(
+        uvicorn.Config(api, host=config_host, port=config_port, log_level="info")
+    )
+    await server.serve()
 
 if __name__ == "__main__":
-    import asyncio
-
-    async def start_all():
-        await app.start()
-        logger.info("🔹 Telegram Bot started successfully!")
-        config = uvicorn.Config(web, host="0.0.0.0", port=8080, log_level="info")
-        server = uvicorn.Server(config)
-        await server.serve()
-
-    asyncio.run(start_all())
+    asyncio.run(main())
