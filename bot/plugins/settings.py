@@ -1,10 +1,13 @@
 # bot/plugins/settings.py
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
 from bot.database.store import get_global_settings, update_global_setting
 import json
 import bot.config as config
 
+# ---------------------------
+# Inline Keyboard
+# ---------------------------
 def settings_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📂 DB Channels", callback_data="settings:db")],
@@ -23,16 +26,18 @@ def settings_kb():
         [InlineKeyboardButton("❌ Close", callback_data="settings:close")],
     ])
 
+# ---------------------------
 # Track pending admin prompts
+# ---------------------------
 _pending = {}  # {admin_id: key_waiting}
 
+# ---------------------------
+# /settings command
+# ---------------------------
 @Client.on_message(filters.command("settings") & filters.private)
 async def settings_cmd(bot: Client, message: Message):
-    # Manual admin check
     if message.from_user.id not in config.ADMIN_IDS:
         return await message.reply_text("❌ You are not allowed to use this command.")
-
-    print("✅ /settings command received from:", message.from_user.id)
 
     gs = await get_global_settings()
     text = "⚙️ **Current Settings:**\n"
@@ -41,9 +46,15 @@ async def settings_cmd(bot: Client, message: Message):
 
     await message.reply_text(text, reply_markup=settings_kb())
 
+# ---------------------------
+# Callback query handler
+# ---------------------------
 @Client.on_callback_query(filters.regex(r"^settings:"))
-async def settings_cb(bot, query):
-    await query.answer()  # Always stop the "loading..." spinner
+async def settings_cb(bot: Client, query: CallbackQuery):
+    if query.from_user.id not in config.ADMIN_IDS:
+        return await query.answer("❌ Not allowed.", show_alert=True)
+
+    await query.answer()  # stop "loading..." spinner
 
     key = query.data.split(":", 1)[1]
     if key == "close":
@@ -66,10 +77,12 @@ async def settings_cb(bot, query):
         "autodelete": "🧹 Send auto-delete seconds (0 = disable).",
     }
 
-    # Safer to send a new message instead of editing
     await query.message.reply_text(prompts.get(key, "Send value:"))
     _pending[query.from_user.id] = key
 
+# ---------------------------
+# Handle admin replies
+# ---------------------------
 @Client.on_message(filters.private & filters.user(lambda uid: uid in config.ADMIN_IDS))
 async def settings_reply(bot: Client, message: Message):
     admin = message.from_user.id
