@@ -11,8 +11,8 @@ API_HASH = os.getenv("API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # MongoDB
-MONGO_URI = os.getenv("MONGO_URI", "")  # e.g. mongodb+srv://user:pass@cluster/db
-DB_NAME = os.getenv("DB_NAME", "telegram_sharebot")
+MONGO_URL = os.getenv("MONGO_URL", "")  # e.g. mongodb+srv://user:pass@cluster/db
+DB_NAME = os.getenv("DB_NAME", "mydatabase")
 
 # Admins (space separated)
 ADMIN_IDS = [int(x) for x in (os.getenv("ADMIN_IDS", "").split()) if x.isdigit()]
