@@ -1,46 +1,53 @@
 import os
 import asyncio
 from fastapi import FastAPI
-import uvicorn
 from pyrogram import Client
-import bot.config as config
+import uvicorn
 
-# ---------------------------
-# FastAPI app (for Koyeb healthcheck)
-# ---------------------------
-api = FastAPI()
+# =========================
+# Environment / Config
+# =========================
+API_ID = int(os.environ.get("API_ID", 12345))        # Replace with your API_ID
+API_HASH = os.environ.get("API_HASH", "your_api_hash")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "your_bot_token")
 
-@api.get("/")
-async def root():
-    return {"status": "ok", "message": "Bot is alive"}
-
-# ---------------------------
-# Pyrogram Client
-# ---------------------------
-bot = Client(
+# Pyrogram client
+app_bot = Client(
     "autofilter_bot",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN,
-    in_memory=True  # prevents sqlite session file issues
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    plugins=dict(root="bot/plugins")   # Folder containing your plugins
 )
 
-# ---------------------------
-# Startup: Run both Bot + FastAPI
-# ---------------------------
-async def main():
-    # Start Pyrogram bot
-    await bot.start()
-    print("✅ Bot started...")
+# =========================
+# FastAPI app
+# =========================
+app = FastAPI(title="Telegram AutoFilter Bot")  # 👈 renamed to `app`
 
-    # Start FastAPI server
-    config_port = int(os.environ.get("PORT", 8080))
-    config_host = "0.0.0.0"
+# =========================
+# Startup / Shutdown
+# =========================
+@app.on_event("startup")
+async def startup_event():
+    print("🔹 Starting Telegram Bot...")
+    asyncio.create_task(app_bot.start())
 
-    server = uvicorn.Server(
-        uvicorn.Config(api, host=config_host, port=config_port, log_level="info")
-    )
-    await server.serve()
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("🔹 Stopping Telegram Bot...")
+    await app_bot.stop()
 
+# =========================
+# Simple health check route
+# =========================
+@app.get("/")
+async def root():
+    return {"status": "AutoFilter Bot is running!"}
+
+# =========================
+# Run directly (optional)
+# =========================
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
