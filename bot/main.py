@@ -1,74 +1,56 @@
-# bot/main.py
+# main.py
 import asyncio
-import logging
+import os
 from pyrogram import Client
 from fastapi import FastAPI
 import uvicorn
 
-# ---------------------------
-# Logging (file + console)
-# ---------------------------
-logging.basicConfig(
-    filename="bot.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-console_handler.setFormatter(formatter)
-logging.getLogger().addHandler(console_handler)
+# --------------------------
+# 🔹 Bot Configuration
+# --------------------------
+API_ID = int(os.environ.get("API_ID", 12345))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
-# ---------------------------
-# Import bot modules
-# ---------------------------
-try:
-    import bot.config as config
-    from bot.plugins import *
-except Exception as e:
-    logging.error(f"❌ Import error: {e}")
-
-# ---------------------------
-# Initialize Pyrogram client
-# ---------------------------
-app = Client(
+bot = Client(
     "autofilter-bot",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN,
-    plugins=dict(root="bot/plugins")
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
 )
 
-# ---------------------------
-# Health check HTTP server for Koyeb
-# ---------------------------
-fastapi_app = FastAPI()
+# --------------------------
+# 🔹 Load Plugins
+# --------------------------
+# Make sure all your plugins are inside bot/plugins/ as .py files
+import glob
+import importlib.util
 
-@fastapi_app.get("/")
-async def health():
-    return {"status": "ok"}
+plugins = glob.glob("bot/plugins/*.py")
+for plugin in plugins:
+    spec = importlib.util.spec_from_file_location(plugin, plugin)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+print(f"✅ Loaded {len(plugins)} plugins.")
 
-async def start_health_server():
-    """Run FastAPI server in background"""
-    config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=8080, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
+# --------------------------
+# 🔹 FastAPI Web Server
+# --------------------------
+app = FastAPI()
 
-# ---------------------------
-# Run both bot and health server
-# ---------------------------
+@app.get("/")
+async def home():
+    return {"status": "Bot is alive!"}
+
+# --------------------------
+# 🔹 Run Bot + Web Server
+# --------------------------
+async def start_bot():
+    async with bot:
+        print("✅ Bot started")
+        await asyncio.Future()  # keep running forever
+
 if __name__ == "__main__":
-    async def main():
-        logging.info("🚀 Starting Telegram AutoFilter Bot...")
-        # Start health server in background
-        asyncio.create_task(start_health_server())
-        # Run Pyrogram bot
-        await app.start()
-        logging.info("✅ Bot started")
-        # Keep bot running forever
-        await asyncio.Event().wait()
-
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        logging.error(f"❌ Bot crashed: {e}")
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot())
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
