@@ -11,16 +11,21 @@ API_ID = int(os.environ.get("API_ID", 12345))        # Replace with your API_ID
 API_HASH = os.environ.get("API_HASH", "your_api_hash")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "your_bot_token")
 
-# Pyrogram client
+# =========================
+# Pyrogram Client
+# =========================
+# Using ":memory:" so no SQLite file is created (fixes "no such table: version" error)
 app_bot = Client(
-    "autofilter_bot",
+    ":memory:",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
     plugins=dict(root="bot/plugins")   # Folder containing your plugins
 )
 
-# FastAPI app
+# =========================
+# FastAPI App
+# =========================
 app = FastAPI(title="Telegram AutoFilter Bot")
 
 # =========================
@@ -37,8 +42,16 @@ async def shutdown_event():
     await app_bot.stop()
 
 # =========================
-# Simple health check route
+# Health Check Route
 # =========================
 @app.get("/")
 async def root():
     return {"status": "AutoFilter Bot is running!"}
+
+# =========================
+# Run directly (optional)
+# =========================
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
